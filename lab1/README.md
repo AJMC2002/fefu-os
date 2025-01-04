@@ -48,9 +48,9 @@
 
 3. Clean the build files:
 
-  ```bash
-  ./linux-mint/clean.sh
-  ```
+   ```bash
+   ./linux-mint/clean.sh
+   ```
 
 > Note: The binary `HelloWorld.out` will be located in the `build` directory after run.
 
