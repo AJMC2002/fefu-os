@@ -14,4 +14,4 @@ cmake ..
 make
 
 echo "Build successful. Running the program..."
-./HelloWorld.o
+./HelloWorld.out
