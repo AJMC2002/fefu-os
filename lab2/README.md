@@ -34,7 +34,6 @@
    ```bash
    cmake -S . -B build
    cmake --build build
-   ./build/tests/test
    ```
 
 ### Windows Systems - *Powershell*
@@ -60,7 +59,6 @@ The library `run_processes` contains the function of the same name which takes i
 The test binary can be found in `build/tests/` with the name `test`.
 
 **UNIX Systems**
-
 
 ```bash
 ./build/tests/test 
