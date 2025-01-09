@@ -29,12 +29,12 @@
    cd fefu-os/lab2/
    ```
 
-2. Invoke Cmake to generate the Makefile and build the binary:
+2. Invoke Cmake to generate the Makefile and build the test binary:
 
    ```bash
-   cmake -B build
+   cmake -S . -B build
    cmake --build build
-   ./build/main.out -n <number> -np <processes>
+   ./build/tests/test
    ```
 
 ### Windows Systems - *Powershell*
@@ -46,64 +46,41 @@
    cd .\fefu-os\lab2\
    ```
 
-2. Invoke Cmake to generate the Makefile and build the binary:
+2. Invoke Cmake to generate the Makefile and build the test binary:
 
    ```powershell
-   cmake -B build
+   cmake -S . -B build
    cmake --build build
-   .\build\main.exe -n <number> -np <processes>
    ```
 
 ## Usage
 
-The program generates the number of sub-processes indicated by `np` and simulates some processing on each child process. It's ouput is whether the number `n` is divisible by the number of processes `np`.
+The library `run_processes` contains the function of the same name which takes in the number of processes (`np`), the name of the program to run (`program`) and a vector containing the args of each process as a vector of strings (`argvv`). The test evaluate different possibilities by using common utilities on Windows and Unix systems.
 
-The way the program simulates its processing on each child is the following:
+The test binary can be found in `build/tests/` with the name `test`.
 
-- Calculate the number of elements that will go in each child process (aka `bucket_size`) without overflow by using `(int)std::ceil((double)n / (double)np)`.
+**UNIX Systems**
 
-- Distribute the numbers from 1 to `n` as lists of at most `bucket_size` length for each child.
 
-- Wait 100 ms for each element in the list received on each child and error if the number of elements isn't equal to `bucket_size`.
-
-- Gather the exit codes on the parent child and check if any of the processes errored. If not, then `n` is divisible by `np`.
-
-*Example 1 (n = 27, np = 4)*
-
-```stdout
-Process 3: Not Equal - [ 22 23 24 25 26 27 ]
-Process 0:     Equal - [ 1 2 3 4 5 6 7 ]
-Process 1:     Equal - [ 8 9 10 11 12 13 14 ]
-Process 2:     Equal - [ 15 16 17 18 19 20 21 ]
---------------------------------------------------
-Process 0: Success
-Process 1: Success
-Process 2: Success
-Process 3: Error
-RESULT: 27 is not divisible by 4.
+```bash
+./build/tests/test 
 ```
 
-*Example 2 (n = 10, np = 5)*
+**Windows Systems**
 
-```stdout
-Process 0:     Equal - [ 1 2 ]
-Process 1:     Equal - [ 3 4 ]
-Process 2:     Equal - [ 5 6 ]
-Process 3:     Equal - [ 7 8 ]
-Process 4:     Equal - [ 9 10 ]
---------------------------------------------------
-Process 0: Success
-Process 1: Success
-Process 2: Success
-Process 3: Success
-Process 4: Success
-RESULT: 10 is  divisible by 5.
+```powershell
+.\build\tests\test.exe
 ```
 
 ## Project Structure
 
 ```
 ./
-├── CMakeLists.txt
-└── main.cpp
+├── lib/
+│   ├── run_processes.cpp
+│   └── run_processes.h
+├── tests/
+│   ├── CMakeLists.txt
+│   └── main.cpp
+└── CMakeLists.txt
 ```
