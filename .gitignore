@@ -1,6 +1,9 @@
 # Build directory
 build
 
+# LSP files
+.cache
+
 # Prerequisites
 *.d
 
