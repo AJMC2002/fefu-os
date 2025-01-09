@@ -5,6 +5,7 @@
 #include <ostream>
 #include <vector>
 #if defined(_WIN32)
+#include <sstream>
 #include <windows.h>
 #elif defined(__unix__)
 #include <algorithm>
