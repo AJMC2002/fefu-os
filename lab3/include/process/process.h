@@ -4,7 +4,6 @@
 #include <atomic>
 #include <cstddef>
 #include <deque>
-#include <mutex>
 
 namespace moski {
 
@@ -17,15 +16,13 @@ struct SharedMemoryLayout {
     using pid_type = DWORD;
 #endif
 
-    std::mutex mutex;
     Counter counter;
     std::deque<pid_type> pids;
 };
 
 class Process {
   public:
-    Process(const char *shm_name, std::size_t shm_size,
-            SharedMemoryLayout *shm);
+    Process(const char *shm_name, std::size_t shm_size);
 
     void run();
 
@@ -35,7 +32,9 @@ class Process {
     const char *shm_name_;
     std::size_t shm_size_;
     SharedMemoryLayout *shm_;
+    SharedMemoryLayout::pid_type pid_;
     bool is_leader_;
+
     std::atomic<bool> is_running_;
     std::atomic<bool> can_spawn_;
     std::atomic<int> active_children_;

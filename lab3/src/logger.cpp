@@ -20,7 +20,7 @@ Logger::Logger() {
     if (!file_.is_open())
         throw std::ios_base::failure("Failed to open log file: " + path);
     else
-        std::cout << "Opened log file at: " + path;
+        std::cout << "Opened log file at: " + path + "\n";
 }
 
 Logger::~Logger() {

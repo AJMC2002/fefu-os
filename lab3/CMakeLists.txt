@@ -18,5 +18,5 @@ add_executable(main ${SRC_DIR}/main.cpp)
 
 target_link_libraries(main PRIVATE moski)
 
-target_compile_options(moski PRIVATE -Wall -Wextra -pedantic)
-target_compile_options(main PRIVATE -Wall -Wextra -pedantic)
+target_compile_options(moski PRIVATE -g -Wall -Wextra -pedantic)
+target_compile_options(main PRIVATE -g -Wall -Wextra -pedantic)
