@@ -1,90 +1,65 @@
-#include "counter.h"
-#include "logger.h"
 #include "process/process.h"
 #include <csignal>
+#include <cstddef>
 #include <cstring>
 #include <iostream>
-#include <queue>
+#include <sstream>
+#include <stdexcept>
 #if defined(_WIN32)
 #include <windows.h>
 #elif defined(__unix__)
-#include <fcntl.h>    // For O_CREAT, O_RDWR
-#include <sys/mman.h> // For shared memory
+#include <fcntl.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 #endif
 
-#define SHARED_MEM_NAME "MOSKI_COUNTER"
-#define SHARED_MEM_SIZE 1024
+constexpr const char *shm_name = "/MOSKI_COUNTER";
+constexpr std::size_t shm_size = sizeof(moski::SharedMemoryLayout);
 
-struct SharedMemoryLayout {
-  moski::Counter counter;
-  std::queue<pid_t> pid_queue;
-};
+moski::SharedMemoryLayout *init_shm() {
+    std::cout << "Shared memory init...";
+    int shm_fd = shm_open(shm_name, O_CREAT | O_RDWR, 0666);
+    if (shm_fd == -1) {
+        std::stringstream ss;
+        ss << "Failed to open or create shared memory: " << strerror(errno)
+           << "\n";
+        throw std::runtime_error(ss.str());
+    }
 
-void cleanup_shared_memory() { shm_unlink(SHARED_MEM_NAME); }
+    if (ftruncate(shm_fd, shm_size) == -1) {
+        std::stringstream ss;
+        ss << "Failed to resize shared memory: " << strerror(errno) << "\n";
+        shm_unlink(shm_name);
+        throw std::runtime_error(ss.str());
+    }
+
+    void *shm_ptr =
+        mmap(nullptr, shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    if (shm_ptr == MAP_FAILED) {
+        std::stringstream ss;
+        ss << "Failed to map shared memory: " << strerror(errno) << "\n";
+        shm_unlink(shm_name);
+        throw std::runtime_error(ss.str());
+    }
+
+    close(shm_fd);
+
+    return static_cast<moski::SharedMemoryLayout *>(shm_ptr);
+}
 
 int main() {
-  int shm_fd = shm_open(SHARED_MEM_NAME, O_CREAT | O_RDWR, 0666);
-  if (shm_fd == -1) {
-    std::cerr << "Failed to open or create shared memory: " << strerror(errno)
-              << std::endl;
-    return 1;
-  }
+    moski::SharedMemoryLayout *shm = init_shm();
 
-  if (ftruncate(shm_fd, SHARED_MEM_SIZE) == -1) {
-    std::cerr << "Failed to resize shared memory: " << strerror(errno)
-              << std::endl;
-    cleanup_shared_memory();
-    return 1;
-  }
+    moski::Process process(shm_name, shm_size, shm);
 
-  void *shared_mem_ptr = mmap(nullptr, SHARED_MEM_SIZE, PROT_READ | PROT_WRITE,
-                              MAP_SHARED, shm_fd, 0);
-  if (shared_mem_ptr == MAP_FAILED) {
-    std::cerr << "Failed to map shared memory: " << strerror(errno)
-              << std::endl;
-    cleanup_shared_memory();
-    return 1;
-  }
+    try {
+        process.run();
+    } catch (...) {
+        shm_unlink(shm_name);
+        throw;
+    }
 
-  close(shm_fd);
-
-  auto *shared_layout = static_cast<SharedMemoryLayout *>(shared_mem_ptr);
-
-  bool is_leader = false;
-  if (shared_layout->pid_queue.empty()) {
-    is_leader = true;
-    std::cout << "This process is the leader." << std::endl;
-  } else {
-    std::cout << "This process is a follower." << std::endl;
-  }
-  shared_layout->pid_queue.push(getpid());
-
-  moski::Counter &shared_counter = shared_layout->counter;
-
-  moski::Process process(shared_counter, is_leader);
-
-  std::signal(SIGINT, [](int) {
-    std::cout << "Process interrupted. Cleaning up..." << std::endl;
-    cleanup_shared_memory();
-    exit(0);
-  });
-
-  // Run the process
-  process.run();
-
-  // Clean up shared memory if this process is the leader
-  if (is_leader) {
-    cleanup_shared_memory();
-  }
-
-  // Unmap the shared memory
-  if (munmap(shared_mem_ptr, SHARED_MEM_SIZE) == -1) {
-    std::cerr << "Failed to unmap shared memory: " << strerror(errno)
-              << std::endl;
-  }
-
-  return 0;
+    return 0;
 }

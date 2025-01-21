@@ -3,13 +3,16 @@ project(counterlib)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # relevant for lsp
+set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
 
 set(INCLUDE_DIR include)
 set(SRC_DIR src)
 
 include_directories(${INCLUDE_DIR})
 
-add_library(moski STATIC ${SRC_DIR}/counter.cpp ${SRC_DIR}/logger.cpp)
+add_library(moski STATIC ${SRC_DIR}/counter.cpp ${SRC_DIR}/logger.cpp
+                         ${SRC_DIR}/process/process.cpp)
 
 add_executable(main ${SRC_DIR}/main.cpp)
 
