@@ -2,8 +2,8 @@
 
 #include <fstream>
 #include <mutex>
-#include <string>
-#if defined(__unix)
+
+#if defined(__unix__)
 #include <unistd.h>
 #elif defined(_WIN32)
 #include <windows.h>
@@ -39,21 +39,9 @@ class Logger {
     void log(const std::string &message);
 
   private:
-    std::ofstream file_;       ///< Stream for writing to the log file.
-    mutable std::mutex mutex_; ///< Mutex for thread-safe logging.
+    std::ofstream file_;         ///< Stream for writing to the log file.
+    mutable std::mutex mutex_;   ///< Mutex for thread-safe logging.
     std::string dir_ = "./logs"; ///< Directory for all the logs.
-
-    /**
-     * @brief Helper function to get the current time in a formatted string.
-     * @return A string in the format `YYYY-MM-DD HH:MM:SS.mmm`.
-     */
-    std::string get_current_time() const;
-
-    /**
-     * @brief Helper function to get the current process' PID.
-     * @return `pid_type` value depending on OS.
-     */
-    pid_type get_current_pid() const;
 };
 
 } // namespace moski

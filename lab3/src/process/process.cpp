@@ -1,36 +1,23 @@
 #include "process/process.h"
+#include "utils.h"
+
 #include <algorithm>
-#include <chrono>
-#include <cstddef>
 #include <cstring>
-#include <deque>
-#include <fcntl.h>
 #include <iostream>
-#include <semaphore.h>
 #include <sstream>
-#include <string>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <thread>
-#include <unistd.h>
+
+#if defined(_WIN32)
+#include <windows.h>
+#elif defined(__unix__)
+#include <fcntl.h>
+#include <sys/mman.h>
+#endif
 
 namespace moski {
 
-namespace {
-
-SharedMemoryLayout::pid_type get_pid() {
-#if defined(__unix)
-    return getpid();
-#elif defined(_WIN32)
-    return GetCurrentProcessId();
-#endif
-}
-
-} // namespace
-
 Process::Process(const char *shm_name, std::size_t shm_size)
-    : shm_name_(shm_name), shm_size_(shm_size), pid_(get_pid()),
+    : shm_name_(shm_name), shm_size_(shm_size), pid_(get_current_pid()),
       is_leader_(false), is_running_(true), can_spawn_(false),
       active_children_(0) {
     std::cout << "Initiating shared memory...\n";
@@ -138,7 +125,7 @@ Process::~Process() {
     if (!shm_->pids.empty()) {
         shm_->counter.log("Process " + std::to_string(pid_) + " exiting.");
         if (is_leader_) {
-            SharedMemoryLayout::pid_type new_leader = shm_->pids.front();
+            pid_type new_leader = shm_->pids.front();
             shm_->counter.log("Leadership transferred to PID: " +
                               std::to_string(new_leader));
         }

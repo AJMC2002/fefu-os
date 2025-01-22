@@ -11,8 +11,10 @@ set(SRC_DIR src)
 
 include_directories(${INCLUDE_DIR})
 
-add_library(moski STATIC ${SRC_DIR}/counter.cpp ${SRC_DIR}/logger.cpp
-                         ${SRC_DIR}/process/process.cpp)
+add_library(
+  moski STATIC
+  ${SRC_DIR}/counter.cpp ${SRC_DIR}/logger.cpp ${SRC_DIR}/process/process.cpp
+  ${SRC_DIR}/signal_handler.cpp ${SRC_DIR}/utils.cpp)
 
 add_executable(main ${SRC_DIR}/main.cpp)
 

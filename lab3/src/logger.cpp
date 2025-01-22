@@ -1,9 +1,12 @@
 #include "logger.h"
+#include "utils.h"
+
 #include <filesystem>
 #include <fstream>
-#include <iomanip>
 #include <iostream>
 #include <string>
+
+
 #include <unistd.h>
 
 namespace moski {
@@ -36,31 +39,8 @@ void Logger::log(const std::string &message) {
         throw std::ios_base::failure("Log file is not open.");
     }
 
-    file_ << "[" << get_current_time() << "]["
-          << std::to_string(get_current_pid()) << "] " << message << "\n";
-}
-
-Logger::pid_type Logger::get_current_pid() const {
-#if defined(__unix)
-    return getpid();
-#elif defined(_WIN32)
-    return GetCurrentProcessId();
-#endif
-};
-
-std::string Logger::get_current_time() const {
-    auto now = std::chrono::system_clock::now();
-    auto time_t_now = std::chrono::system_clock::to_time_t(now);
-    auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(
-                            now.time_since_epoch()) %
-                        1000;
-
-    std::stringstream time_stream;
-    time_stream << std::put_time(std::localtime(&time_t_now),
-                                 "%Y-%m-%d %H:%M:%S")
-                << "." << std::setfill('0') << std::setw(3)
-                << milliseconds.count();
-    return time_stream.str();
+    file_ << "[" << get_current_time() << "][" << std::to_string(get_current_pid())
+          << "] " << message << "\n";
 }
 
 } // namespace moski
