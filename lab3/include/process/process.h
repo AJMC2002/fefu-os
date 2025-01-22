@@ -4,6 +4,7 @@
 #include <atomic>
 #include <cstddef>
 #include <deque>
+#include <semaphore.h>
 
 namespace moski {
 
@@ -16,6 +17,7 @@ struct SharedMemoryLayout {
     using pid_type = DWORD;
 #endif
 
+    sem_t semaphore;
     Counter counter;
     std::deque<pid_type> pids;
 };

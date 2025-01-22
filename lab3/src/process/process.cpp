@@ -3,8 +3,10 @@
 #include <chrono>
 #include <cstddef>
 #include <cstring>
+#include <deque>
 #include <fcntl.h>
 #include <iostream>
+#include <semaphore.h>
 #include <sstream>
 #include <string>
 #include <sys/mman.h>
@@ -34,7 +36,7 @@ Process::Process(const char *shm_name, std::size_t shm_size)
     std::cout << "Initiating shared memory...\n";
     int shm_fd = shm_open(shm_name, O_CREAT | O_EXCL | O_RDWR, 0666);
     if (shm_fd == -1 && errno == EEXIST)
-        shm_fd = shm_open(shm_name, O_CREAT | O_RDWR, 0666);
+        shm_fd = shm_open(shm_name, O_RDWR, 0666);
     else
         is_leader_ = true;
 
@@ -68,22 +70,38 @@ Process::Process(const char *shm_name, std::size_t shm_size)
     shm_ = static_cast<moski::SharedMemoryLayout *>(shm_ptr);
 
     if (is_leader_) {
-        shm_ = new SharedMemoryLayout();
-        shm_->counter.log("This process is the leader.");
-    } else {
-        shm_->counter.log("This process is a follower.");
+        new (shm_) SharedMemoryLayout();
+        sem_init(&shm_->semaphore, 1, 1);
     }
+
+    sem_wait(&shm_->semaphore);
+    if (is_leader_)
+        shm_->counter.log("This process is the leader.");
+    else
+        shm_->counter.log("This process is a follower.");
     shm_->pids.emplace_back(pid_);
+    sem_post(&shm_->semaphore);
 }
 
 void Process::run() {
+    std::thread counter_thread([this]() {
+        while (is_running_) {
+            sem_wait(&shm_->semaphore);
+            shm_->counter += 1;
+            sem_post(&shm_->semaphore);
+            std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        }
+    });
+
     std::thread leader_thread([this]() {
         while (is_running_) {
+            sem_wait(&shm_->semaphore);
             if (!shm_->pids.empty() && shm_->pids.front() == pid_) {
                 is_leader_ = true;
             } else {
                 is_leader_ = false;
             }
+            sem_post(&shm_->semaphore);
 
             if (is_leader_) {
                 std::cout << "This process is the leader.\n";
@@ -97,12 +115,13 @@ void Process::run() {
 
     std::thread stop_thread([this]() {
         std::cout << "Sleeping for 10 seconds...\n";
-        sleep(4);
+        std::this_thread::sleep_for(std::chrono::seconds(4));
 
         is_running_ = false;
         std::cout << "Stopping the process...\n";
     });
 
+    counter_thread.join();
     leader_thread.join();
     stop_thread.join();
 }
@@ -110,6 +129,7 @@ void Process::run() {
 Process::~Process() {
     std::cout << "Exiting...\n";
 
+    sem_wait(&shm_->semaphore);
     auto it = std::find(shm_->pids.begin(), shm_->pids.end(), pid_);
     if (it != shm_->pids.end())
         shm_->pids.erase(it);
@@ -127,10 +147,20 @@ Process::~Process() {
         if (is_leader_)
             shm_->counter.log("No processes left. Unlinking shared memory.");
     }
+    sem_post(&shm_->semaphore);
 
-    if (munmap(static_cast<void *>(shm_), shm_size_) == -1) {
+    if (unlink) {
+        shm_->counter.~Counter();
+    }
+
+    if (unlink) {
+        sem_destroy(&shm_->semaphore);
+    }
+
+    if (munmap(shm_, shm_size_) == -1) {
         std::cerr << "Failed to unmap shared memory: " << strerror(errno)
                   << "\n";
+        shm_unlink(shm_name_);
     } else {
         std::cout << "Shared memory unmapped successfully. Finished work.\n";
     }

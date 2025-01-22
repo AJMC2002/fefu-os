@@ -40,19 +40,6 @@ void Logger::log(const std::string &message) {
           << std::to_string(get_current_pid()) << "] " << message << "\n";
 }
 
-Logger::Logger(Logger &&other) noexcept {
-    std::lock_guard<std::mutex> lock(mutex_);
-    file_ = std::move(other.file_);
-}
-
-Logger &Logger::operator=(Logger &&other) noexcept {
-    if (this != &other) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        file_ = std::move(other.file_);
-    }
-    return *this;
-}
-
 Logger::pid_type Logger::get_current_pid() const {
 #if defined(__unix)
     return getpid();

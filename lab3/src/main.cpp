@@ -1,11 +1,10 @@
+#include "logger.h"
 #include "process/process.h"
 #include <cerrno>
 #include <csignal>
 #include <cstddef>
 #include <cstring>
 #include <iostream>
-#include <sstream>
-#include <stdexcept>
 #if defined(_WIN32)
 #include <windows.h>
 #elif defined(__unix__)
@@ -17,7 +16,7 @@
 #endif
 
 constexpr const char *shm_name = "/MOSKI_COUNTER";
-constexpr std::size_t shm_size = sizeof(moski::SharedMemoryLayout);
+constexpr std::size_t shm_size = sizeof(moski::SharedMemoryLayout) + 1024;
 
 int main() {
     std::cout << "Starting process\n";

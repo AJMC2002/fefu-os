@@ -38,22 +38,9 @@ class Logger {
      */
     void log(const std::string &message);
 
-    /**
-     * @brief Prevent copying of Logger instances.
-     */
-    Logger(const Logger &) = delete;
-    Logger &operator=(const Logger &) = delete;
-
-    /**
-     * @brief Allow moving of Logger instances.
-     */
-    Logger(Logger &&other) noexcept;
-    Logger &operator=(Logger &&other) noexcept;
-
   private:
     std::ofstream file_;       ///< Stream for writing to the log file.
     mutable std::mutex mutex_; ///< Mutex for thread-safe logging.
-
     std::string dir_ = "./logs"; ///< Directory for all the logs.
 
     /**

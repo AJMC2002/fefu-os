@@ -16,7 +16,7 @@ add_library(moski STATIC ${SRC_DIR}/counter.cpp ${SRC_DIR}/logger.cpp
 
 add_executable(main ${SRC_DIR}/main.cpp)
 
-target_link_libraries(main PRIVATE moski)
+target_link_libraries(main PUBLIC moski)
 
 target_compile_options(moski PRIVATE -g -Wall -Wextra -pedantic)
 target_compile_options(main PRIVATE -g -Wall -Wextra -pedantic)
