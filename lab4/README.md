@@ -16,4 +16,4 @@ cmake -S . -B build && cmake --build build/
 ./build/main
 ```
 
-Finally just `pkill SOCAT_PID` and then Ctrl+C both programs.
+Finally just Ctrl+C both programs and then `pkill SOCAT_PID`.
