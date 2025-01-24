@@ -27,16 +27,22 @@ class Logger {
     explicit Logger();
 
     /**
-     * @brief Destructor for Logger. Closes the log file if open.
-     */
-    ~Logger();
-
-    /**
      * @brief Writes a message to the log file with a timestamp and the current
      * process' pid.
      * @param `message` The message to log.
      */
     void log(const std::string &message);
+
+    /**
+     * @brief Flushes the internal state of the Logger (e.g., logs) to ensure
+     * all data is written and closes the file.
+     */
+    void cleanup();
+
+    /**
+     * @brief Destructor for Logger. Closes the log file if open.
+     */
+    ~Logger();
 
   private:
     std::ofstream file_;         ///< Stream for writing to the log file.

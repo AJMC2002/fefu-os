@@ -10,7 +10,7 @@
 #endif
 
 constexpr const char *shm_name = "/MOSKI_COUNTER";
-constexpr std::size_t shm_size = sizeof(moski::SharedMemoryLayout) + 1024;
+constexpr std::size_t shm_size = sizeof(moski::SharedMemoryLayout);
 
 int main() {
     std::cout << "Starting process\n";

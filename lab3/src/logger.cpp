@@ -6,9 +6,6 @@
 #include <iostream>
 #include <string>
 
-
-#include <unistd.h>
-
 namespace moski {
 
 Logger::Logger() {
@@ -23,14 +20,7 @@ Logger::Logger() {
     if (!file_.is_open())
         throw std::ios_base::failure("Failed to open log file: " + path);
     else
-        std::cout << "Opened log file at: " + path + "\n";
-}
-
-Logger::~Logger() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (file_.is_open()) {
-        file_.close();
-    }
+        std::cout << "Opened log file at: \"" + path + "\"\n";
 }
 
 void Logger::log(const std::string &message) {
@@ -39,8 +29,23 @@ void Logger::log(const std::string &message) {
         throw std::ios_base::failure("Log file is not open.");
     }
 
-    file_ << "[" << get_current_time() << "][" << std::to_string(get_current_pid())
-          << "] " << message << "\n";
+    file_ << "[" << get_current_time() << "]["
+          << std::to_string(get_current_pid()) << "] " << message << "\n";
+}
+
+void Logger::cleanup() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (file_.is_open()) {
+        file_.flush();
+        file_.close();
+    }
+}
+
+Logger::~Logger() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (file_.is_open()) {
+        file_.close();
+    }
 }
 
 } // namespace moski

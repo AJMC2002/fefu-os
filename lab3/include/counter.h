@@ -65,6 +65,12 @@ class Counter {
      */
     void log(std::string const &message) const;
 
+    /**
+     * @brief Flushes the internal state of the Counter (e.g., logs) to ensure
+     * all data is written and closes the file.
+     */
+    void cleanup();
+
   private:
     int value_; ///< Current value of the counter.
     mutable std::mutex

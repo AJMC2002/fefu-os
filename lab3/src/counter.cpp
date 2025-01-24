@@ -58,4 +58,6 @@ void Counter::operator/=(int const &n) {
 
 void Counter::log(const std::string &message) const { logger_.log(message); }
 
+void Counter::cleanup() { logger_.cleanup(); }
+
 } // namespace moski

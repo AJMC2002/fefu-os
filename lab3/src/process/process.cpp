@@ -1,10 +1,11 @@
 #include "process/process.h"
+#include "process/subprocessA.h"
 #include "utils.h"
 
-#include <algorithm>
 #include <cstring>
 #include <iostream>
 #include <sstream>
+#include <string>
 #include <thread>
 
 #if defined(_WIN32)
@@ -23,7 +24,7 @@ Process::Process(const char *shm_name, std::size_t shm_size)
     std::cout << "Initiating shared memory...\n";
     int shm_fd = shm_open(shm_name, O_CREAT | O_EXCL | O_RDWR, 0666);
     if (shm_fd == -1 && errno == EEXIST)
-        shm_fd = shm_open(shm_name, O_RDWR, 0666);
+        shm_fd = shm_open(shm_name, O_CREAT | O_RDWR, 0666);
     else
         is_leader_ = true;
 
@@ -37,7 +38,8 @@ Process::Process(const char *shm_name, std::size_t shm_size)
     if (ftruncate(shm_fd, shm_size) == -1) {
         std::stringstream ss;
         ss << "Failed to resize shared memory: " << strerror(errno) << "\n";
-        shm_unlink(shm_name);
+        if (is_leader_)
+            shm_unlink(shm_name);
         throw std::runtime_error(ss.str());
     }
 
@@ -46,15 +48,19 @@ Process::Process(const char *shm_name, std::size_t shm_size)
     if (shm_ptr == MAP_FAILED) {
         std::stringstream ss;
         ss << "Failed to map shared memory: " << strerror(errno) << "\n";
-        shm_unlink(shm_name);
+        if (is_leader_)
+            shm_unlink(shm_name);
         throw std::runtime_error(ss.str());
     }
 
     close(shm_fd);
 
-    std::cout << "Shared memory successfully initiated.\n";
-
     shm_ = static_cast<moski::SharedMemoryLayout *>(shm_ptr);
+
+    if (!is_leader_) {
+        if (kill(shm_->leader_pid, 0) != 0)
+            is_leader_ = true;
+    }
 
     if (is_leader_) {
         new (shm_) SharedMemoryLayout();
@@ -62,28 +68,24 @@ Process::Process(const char *shm_name, std::size_t shm_size)
     }
 
     sem_wait(&shm_->semaphore);
-    if (is_leader_)
+    if (is_leader_) {
+        shm_->leader_pid = pid_;
+        shm_->process_count = 0;
         shm_->counter.log("This process is the leader.");
-    else
+    } else
         shm_->counter.log("This process is a follower.");
-    shm_->pids.emplace_back(pid_);
+    shm_->process_count++;
     sem_post(&shm_->semaphore);
+
+    std::cout << "Shared memory successfully initiated.\n";
 }
 
 void Process::run() {
-    std::thread counter_thread([this]() {
-        while (is_running_) {
-            sem_wait(&shm_->semaphore);
-            shm_->counter += 1;
-            sem_post(&shm_->semaphore);
-            std::this_thread::sleep_for(std::chrono::milliseconds(300));
-        }
-    });
-
     std::thread leader_thread([this]() {
         while (is_running_) {
             sem_wait(&shm_->semaphore);
-            if (!shm_->pids.empty() && shm_->pids.front() == pid_) {
+            if (shm_->leader_pid == pid_ || shm_->leader_pid == -1) {
+                shm_->leader_pid = pid_;
                 is_leader_ = true;
             } else {
                 is_leader_ = false;
@@ -96,51 +98,57 @@ void Process::run() {
                 std::cout << "This process is a follower.\n";
             }
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            std::this_thread::sleep_for(std::chrono::milliseconds(350));
         }
     });
 
-    std::thread stop_thread([this]() {
-        std::cout << "Sleeping for 10 seconds...\n";
-        std::this_thread::sleep_for(std::chrono::seconds(4));
-
-        is_running_ = false;
-        std::cout << "Stopping the process...\n";
+    std::thread counter_thread([this]() {
+        while (is_running_) {
+            sem_wait(&shm_->semaphore);
+            shm_->counter += 1;
+            sem_post(&shm_->semaphore);
+            std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        }
     });
 
-    counter_thread.join();
+    std::thread logger_thread([this]() {
+        while (is_running_) {
+            sem_wait(&shm_->semaphore);
+            shm_->counter.log("Current value: " +
+                              std::to_string(shm_->counter.get_value()));
+            sem_post(&shm_->semaphore);
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+    });
+
+    std::thread spawner_thread([this]() {
+        while (is_running_) {
+            std::this_thread::sleep_for(std::chrono::seconds(3));
+            if (is_leader_) {
+                spawn_child_processes();
+            }
+        }
+    });
+
     leader_thread.join();
-    stop_thread.join();
+    counter_thread.join();
+    logger_thread.join();
+    spawner_thread.join();
 }
 
 Process::~Process() {
     std::cout << "Exiting...\n";
 
     sem_wait(&shm_->semaphore);
-    auto it = std::find(shm_->pids.begin(), shm_->pids.end(), pid_);
-    if (it != shm_->pids.end())
-        shm_->pids.erase(it);
-
-    bool unlink = false;
-    if (!shm_->pids.empty()) {
-        shm_->counter.log("Process " + std::to_string(pid_) + " exiting.");
-        if (is_leader_) {
-            pid_type new_leader = shm_->pids.front();
-            shm_->counter.log("Leadership transferred to PID: " +
-                              std::to_string(new_leader));
-        }
-    } else {
-        unlink = true;
-        if (is_leader_)
-            shm_->counter.log("No processes left. Unlinking shared memory.");
-    }
+    shm_->counter.log("Process " + std::to_string(pid_) + " exiting.");
+    if (is_leader_)
+        shm_->leader_pid = -1;
+    shm_->process_count--;
+    bool have_to_unlink = shm_->process_count <= 0;
     sem_post(&shm_->semaphore);
 
-    if (unlink) {
-        shm_->counter.~Counter();
-    }
-
-    if (unlink) {
+    if (have_to_unlink) {
+        shm_->counter.cleanup();
         sem_destroy(&shm_->semaphore);
     }
 
@@ -152,12 +160,50 @@ Process::~Process() {
         std::cout << "Shared memory unmapped successfully. Finished work.\n";
     }
 
-    if (unlink) {
-        if (shm_unlink(shm_name_) == -1) {
+    if (have_to_unlink) {
+        if (shm_unlink(shm_name_) == -1)
             std::cerr << "Failed to unlink shared memory: " << strerror(errno)
                       << "\n";
-        }
+        else
+            std::cout << "Unlinked shared memory successfully";
     }
+}
+
+void Process::spawn_child_processes() {
+    if (active_children_ > 0) {
+        sem_wait(&shm_->semaphore);
+        shm_->counter.log("Child processes are still running. Skipping spawn.");
+        sem_post(&shm_->semaphore);
+        return;
+    }
+
+    pid_t pidA = fork();
+    if (pidA == 0) {
+        SubProcessA subProcessA(shm_name_, shm_size_);
+        subProcessA.run();
+        exit(0);
+    } else if (pidA > 0) {
+        active_children_++;
+    } else {
+        std::cerr << "Failed to fork SubProcessA: " << strerror(errno) << "\n";
+        return;
+    }
+
+    pid_t pidB = fork();
+    if (pidB == 0) {
+        SubProcessA subProcessB(shm_name_, shm_size_);
+        subProcessB.run();
+        exit(0);
+    } else if (pidB > 0) {
+        active_children_++;
+    } else {
+        std::cerr << "Failed to fork SubProcessB: " << strerror(errno) << "\n";
+        return;
+    }
+
+    sem_wait(&shm_->semaphore);
+    shm_->counter.log("Spawned SubProcessA and SubProcessB.");
+    sem_post(&shm_->semaphore);
 }
 
 } // namespace moski

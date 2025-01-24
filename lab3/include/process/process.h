@@ -4,7 +4,7 @@
 #include "utils.h"
 
 #include <atomic>
-#include <deque>
+#include <cstddef>
 
 #if defined(__unix__)
 #include <semaphore.h>
@@ -20,7 +20,8 @@ namespace moski {
 struct SharedMemoryLayout {
     sem_t semaphore;           ///< Semaphore for synchronization.
     Counter counter;           ///< Thread-safe counter for shared operations.
-    std::deque<pid_type> pids; ///< List of process IDs using the shared memory.
+    pid_type leader_pid;       ///< Process ID in charge of spawning.
+    std::size_t process_count; ///< Count of processes currently active.
 };
 
 /**
@@ -59,17 +60,10 @@ class Process {
     std::atomic<bool> can_spawn_; ///< Flag to control child process spawning.
     std::atomic<int> active_children_; ///< Number of active child processes.
 
-    /**
-     * @brief Timer function that increments the counter at regular intervals.
-     * @param counter Reference to the Counter object to increment.
+    /*
+     * @bried Spawns both children processes.
      */
-    void timer(Counter &counter);
-
-    /**
-     * @brief Spawner function that manages child process creation.
-     * @param counter Reference to the Counter object for shared operations.
-     */
-    void spawner(Counter &counter);
+    void spawn_child_processes();
 };
 
 } // namespace moski
